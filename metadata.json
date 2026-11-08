@@ -1,0 +1,6 @@
+{
+  "name": "SwiftShare",
+  "description": "نقل لاسلكي فائق السرعة للبيانات والملفات والصور بين الهاتف والحاسوب بخصوصية تامة عبر الشبكة المحلية بدون إنترنت",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
