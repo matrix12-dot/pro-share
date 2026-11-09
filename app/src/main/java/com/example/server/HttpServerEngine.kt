@@ -18,6 +18,8 @@ import java.util.zip.ZipOutputStream
 class HttpServerEngine(
     private val context: Context,
     private val onFileReceived: (ReceivedFile) -> Unit,
+    private val onFileSent: (SharedFile) -> Unit = {},
+    private val onZipSent: (Int) -> Unit = {},
     private val onClipboardUpdated: (String) -> Unit,
     private val getSharedFiles: () -> List<SharedFile>,
     private val getClipboardText: () -> String,
@@ -242,6 +244,7 @@ class HttpServerEngine(
                 }
             }
             outputStream.flush()
+            onFileSent(file)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -280,6 +283,7 @@ class HttpServerEngine(
             }
             zipOut.finish()
             zipOut.flush()
+            onZipSent(files.size)
         } catch (e: Exception) {
             e.printStackTrace()
         }

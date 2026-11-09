@@ -16,6 +16,7 @@ import com.example.data.model.ServerStatus
 import com.example.data.model.SharedFile
 import com.example.server.HttpServerEngine
 import com.example.util.NetworkUtils
+import com.example.util.NotificationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,16 +64,30 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
         serverEngine = HttpServerEngine(
             context = context,
             onFileReceived = { file ->
+                NotificationHelper.notifyFileReceived(context, file)
                 viewModelScope.launch(Dispatchers.Main) {
                     _receivedFiles.update { listOf(file) + it }
-                    _userMessage.value = "تم استلام ملف جديد من الحاسوب: ${file.name}"
+                    _userMessage.value = "📥 تم استلام ملف: ${file.name}"
+                }
+            },
+            onFileSent = { file ->
+                NotificationHelper.notifyFileSent(context, file)
+                viewModelScope.launch(Dispatchers.Main) {
+                    _userMessage.value = "📤 تم إرسال الملف للحاسوب: ${file.name}"
+                }
+            },
+            onZipSent = { count ->
+                NotificationHelper.notifyZipSent(context, count)
+                viewModelScope.launch(Dispatchers.Main) {
+                    _userMessage.value = "📦 تم تنزيل حزمة ZIP ($count ملفات) على الحاسوب"
                 }
             },
             onClipboardUpdated = { text ->
+                NotificationHelper.notifyClipboardReceived(context, text)
                 viewModelScope.launch(Dispatchers.Main) {
                     _clipboardText.value = text
                     copyToSystemClipboard(text)
-                    _userMessage.value = "تم تحديث الحافظة من الحاسوب"
+                    _userMessage.value = "📋 تم تحديث الحافظة من الحاسوب"
                 }
             },
             getSharedFiles = { _sharedFiles.value },
