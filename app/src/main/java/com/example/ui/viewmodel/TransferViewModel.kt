@@ -10,6 +10,7 @@ import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.model.ActiveTransferProgress
 import com.example.data.model.FileCategory
 import com.example.data.model.ReceivedFile
 import com.example.data.model.ServerStatus
@@ -52,6 +53,9 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage = _userMessage.asStateFlow()
 
+    private val _activeTransfer = MutableStateFlow(ActiveTransferProgress())
+    val activeTransfer = _activeTransfer.asStateFlow()
+
     private var serverEngine: HttpServerEngine? = null
 
     init {
@@ -81,6 +85,9 @@ class TransferViewModel(application: Application) : AndroidViewModel(application
                 viewModelScope.launch(Dispatchers.Main) {
                     _userMessage.value = "📦 تم تنزيل حزمة ZIP ($count ملفات) على الحاسوب"
                 }
+            },
+            onProgressUpdate = { progress ->
+                _activeTransfer.value = progress
             },
             onClipboardUpdated = { text ->
                 NotificationHelper.notifyClipboardReceived(context, text)

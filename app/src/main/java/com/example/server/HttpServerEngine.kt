@@ -2,6 +2,7 @@ package com.example.server
 
 import android.content.Context
 import android.net.Uri
+import com.example.data.model.ActiveTransferProgress
 import com.example.data.model.ReceivedFile
 import com.example.data.model.SharedFile
 import java.io.*
@@ -20,6 +21,7 @@ class HttpServerEngine(
     private val onFileReceived: (ReceivedFile) -> Unit,
     private val onFileSent: (SharedFile) -> Unit = {},
     private val onZipSent: (Int) -> Unit = {},
+    private val onProgressUpdate: (ActiveTransferProgress) -> Unit = {},
     private val onClipboardUpdated: (String) -> Unit,
     private val getSharedFiles: () -> List<SharedFile>,
     private val getClipboardText: () -> String,
@@ -216,6 +218,23 @@ class HttpServerEngine(
     }
 
     private fun streamFileDownload(outputStream: OutputStream, file: SharedFile) {
+        val totalBytes = file.sizeBytes
+        var bytesReadSoFar = 0L
+        var lastUpdateTime = System.currentTimeMillis()
+        var lastBytes = 0L
+
+        onProgressUpdate(
+            ActiveTransferProgress(
+                id = file.id,
+                fileName = file.name,
+                bytesTransferred = 0L,
+                totalBytes = totalBytes,
+                isReceiving = false,
+                speedMBps = 0f,
+                isActive = true
+            )
+        )
+
         try {
             val contentResolver = context.contentResolver
             val inputStream = contentResolver.openInputStream(file.uri) ?: run {
@@ -241,16 +260,56 @@ class HttpServerEngine(
                     outputStream.write(buffer, 0, bytesRead)
                     totalBytesSent.addAndGet(bytesRead.toLong())
                     recentTransferredBytes.addAndGet(bytesRead.toLong())
+                    bytesReadSoFar += bytesRead
+
+                    val now = System.currentTimeMillis()
+                    if (now - lastUpdateTime >= 100 || bytesReadSoFar >= totalBytes) {
+                        val durationSec = (now - lastUpdateTime).coerceAtLeast(1) / 1000f
+                        val speed = if (durationSec > 0) ((bytesReadSoFar - lastBytes) / (1024f * 1024f)) / durationSec else 0f
+                        lastUpdateTime = now
+                        lastBytes = bytesReadSoFar
+
+                        onProgressUpdate(
+                            ActiveTransferProgress(
+                                id = file.id,
+                                fileName = file.name,
+                                bytesTransferred = bytesReadSoFar,
+                                totalBytes = totalBytes,
+                                isReceiving = false,
+                                speedMBps = speed.coerceAtLeast(0f),
+                                isActive = true
+                            )
+                        )
+                    }
                 }
             }
             outputStream.flush()
             onFileSent(file)
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            onProgressUpdate(ActiveTransferProgress(isActive = false))
         }
     }
 
     private fun streamZipDownload(outputStream: OutputStream, files: List<SharedFile>) {
+        val totalBytes = files.sumOf { it.sizeBytes }
+        var bytesZippedSoFar = 0L
+        var lastUpdateTime = System.currentTimeMillis()
+        var lastBytes = 0L
+
+        onProgressUpdate(
+            ActiveTransferProgress(
+                id = "zip_${System.currentTimeMillis()}",
+                fileName = "حزمة ZIP (${files.size} ملفات)",
+                bytesTransferred = 0L,
+                totalBytes = totalBytes,
+                isReceiving = false,
+                speedMBps = 0f,
+                isActive = true
+            )
+        )
+
         try {
             val headers = "HTTP/1.1 200 OK\r\n" +
                     "Content-Type: application/zip\r\n" +
@@ -274,6 +333,27 @@ class HttpServerEngine(
                             zipOut.write(buffer, 0, read)
                             totalBytesSent.addAndGet(read.toLong())
                             recentTransferredBytes.addAndGet(read.toLong())
+                            bytesZippedSoFar += read
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastUpdateTime >= 100 || (totalBytes > 0 && bytesZippedSoFar >= totalBytes)) {
+                                val durationSec = (now - lastUpdateTime).coerceAtLeast(1) / 1000f
+                                val speed = if (durationSec > 0) ((bytesZippedSoFar - lastBytes) / (1024f * 1024f)) / durationSec else 0f
+                                lastUpdateTime = now
+                                lastBytes = bytesZippedSoFar
+
+                                onProgressUpdate(
+                                    ActiveTransferProgress(
+                                        id = "zip_active",
+                                        fileName = "حزمة ZIP (${files.size} ملفات)",
+                                        bytesTransferred = bytesZippedSoFar,
+                                        totalBytes = totalBytes,
+                                        isReceiving = false,
+                                        speedMBps = speed.coerceAtLeast(0f),
+                                        isActive = true
+                                    )
+                                )
+                            }
                         }
                         zipOut.closeEntry()
                     }
@@ -286,6 +366,8 @@ class HttpServerEngine(
             onZipSent(files.size)
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            onProgressUpdate(ActiveTransferProgress(isActive = false))
         }
     }
 
@@ -295,6 +377,23 @@ class HttpServerEngine(
         filename: String,
         contentLength: Long
     ) {
+        val fileId = "recv_${System.currentTimeMillis()}"
+        var bytesWrittenSoFar = 0L
+        var lastUpdateTime = System.currentTimeMillis()
+        var lastBytes = 0L
+
+        onProgressUpdate(
+            ActiveTransferProgress(
+                id = fileId,
+                fileName = filename,
+                bytesTransferred = 0L,
+                totalBytes = contentLength.coerceAtLeast(0L),
+                isReceiving = true,
+                speedMBps = 0f,
+                isActive = true
+            )
+        )
+
         try {
             val downloadsDir = File(context.filesDir, "received").apply { mkdirs() }
             val uniqueFile = getUniqueFile(downloadsDir, filename)
@@ -311,9 +410,30 @@ class HttpServerEngine(
                     if (read == -1) break
                     out.write(buffer, 0, read)
                     totalWritten += read
+                    bytesWrittenSoFar += read
                     totalBytesReceived.addAndGet(read.toLong())
                     recentTransferredBytes.addAndGet(read.toLong())
                     if (contentLength > 0) remaining -= read
+
+                    val now = System.currentTimeMillis()
+                    if (now - lastUpdateTime >= 100 || (contentLength > 0 && bytesWrittenSoFar >= contentLength)) {
+                        val durationSec = (now - lastUpdateTime).coerceAtLeast(1) / 1000f
+                        val speed = if (durationSec > 0) ((bytesWrittenSoFar - lastBytes) / (1024f * 1024f)) / durationSec else 0f
+                        lastUpdateTime = now
+                        lastBytes = bytesWrittenSoFar
+
+                        onProgressUpdate(
+                            ActiveTransferProgress(
+                                id = fileId,
+                                fileName = uniqueFile.name,
+                                bytesTransferred = bytesWrittenSoFar,
+                                totalBytes = if (contentLength > 0) contentLength else bytesWrittenSoFar,
+                                isReceiving = true,
+                                speedMBps = speed.coerceAtLeast(0f),
+                                isActive = true
+                            )
+                        )
+                    }
                 }
             }
 
@@ -332,6 +452,8 @@ class HttpServerEngine(
         } catch (e: Exception) {
             e.printStackTrace()
             sendJsonResponse(outputStream, 500, """{"error":"Upload failed: ${e.message}"}""")
+        } finally {
+            onProgressUpdate(ActiveTransferProgress(isActive = false))
         }
     }
 

@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
                     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
                     val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
                     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
+                    val activeTransfer by viewModel.activeTransfer.collectAsStateWithLifecycle()
 
                     val context = LocalContext.current
                     val snackbarHostState = remember { SnackbarHostState() }
@@ -246,6 +247,9 @@ class MainActivity : ComponentActivity() {
                                 onGenerateNewPin = { viewModel.generateNewPin() }
                             )
 
+                            // Live Transfer Progress Bar with accurate percentage
+                            LiveTransferProgressBar(activeTransfer = activeTransfer)
+
                             // Tabs Content
                             AnimatedContent(
                                 targetState = activeTab,
@@ -262,6 +266,7 @@ class MainActivity : ComponentActivity() {
                                             StagedFilesList(
                                                 files = sharedFiles,
                                                 selectedCategory = selectedCategory,
+                                                activeTransfer = activeTransfer,
                                                 onRemoveFile = { viewModel.removeSharedFile(it) },
                                                 onClearAll = { viewModel.clearAllSharedFiles() },
                                                 onPickPhotos = {
@@ -284,6 +289,7 @@ class MainActivity : ComponentActivity() {
                                             ReceivedFilesList(
                                                 files = receivedFiles,
                                                 selectedCategory = selectedCategory,
+                                                activeTransfer = activeTransfer,
                                                 onOpenFile = { viewModel.openReceivedFile(it) },
                                                 onShareFile = { viewModel.shareReceivedFile(it) },
                                                 onDeleteFile = { viewModel.deleteReceivedFile(it) }

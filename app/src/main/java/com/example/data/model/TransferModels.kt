@@ -67,6 +67,35 @@ data class ServerStatus(
         get() = "http://$ipAddress:$port"
 }
 
+data class ActiveTransferProgress(
+    val id: String = "",
+    val fileName: String = "",
+    val bytesTransferred: Long = 0L,
+    val totalBytes: Long = 0L,
+    val isReceiving: Boolean = true, // true: receiving from PC, false: sending to PC
+    val speedMBps: Float = 0f,
+    val isActive: Boolean = false
+) {
+    val progress: Float
+        get() = if (totalBytes > 0) (bytesTransferred.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f) else 0f
+
+    val percentage: Int
+        get() = (progress * 100).toInt()
+
+    val formattedTransferred: String
+        get() = formatFileSize(bytesTransferred)
+
+    val formattedTotal: String
+        get() = formatFileSize(totalBytes)
+
+    val etaSeconds: Int
+        get() {
+            if (speedMBps <= 0f || totalBytes <= bytesTransferred) return 0
+            val remainingMB = (totalBytes - bytesTransferred) / (1024f * 1024f)
+            return (remainingMB / speedMBps).toInt().coerceAtLeast(0)
+        }
+}
+
 fun formatFileSize(bytes: Long): String {
     if (bytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")

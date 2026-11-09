@@ -34,4 +34,24 @@ class ExampleUnitTest {
     assertEquals(FileCategory.AUDIO, FileCategory.fromMime("audio/mpeg"))
     assertEquals(FileCategory.DOCUMENT, FileCategory.fromMime("application/pdf"))
   }
+
+  @Test
+  fun testActiveTransferProgress() {
+    val progress50 = com.example.data.model.ActiveTransferProgress(
+      id = "1",
+      fileName = "video.mp4",
+      bytesTransferred = 50 * 1024 * 1024,
+      totalBytes = 100 * 1024 * 1024,
+      speedMBps = 10f,
+      isActive = true
+    )
+    assertEquals(0.5f, progress50.progress, 0.001f)
+    assertEquals(50, progress50.percentage)
+    assertEquals(5, progress50.etaSeconds)
+
+    val progress100 = progress50.copy(bytesTransferred = 100 * 1024 * 1024)
+    assertEquals(1.0f, progress100.progress, 0.001f)
+    assertEquals(100, progress100.percentage)
+    assertEquals(0, progress100.etaSeconds)
+  }
 }

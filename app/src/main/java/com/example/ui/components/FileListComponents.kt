@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.ActiveTransferProgress
 import com.example.data.model.FileCategory
 import com.example.data.model.ReceivedFile
 import com.example.data.model.SharedFile
@@ -69,6 +70,7 @@ fun CategoryFilterRow(
 fun StagedFilesList(
     files: List<SharedFile>,
     selectedCategory: FileCategory,
+    activeTransfer: ActiveTransferProgress = ActiveTransferProgress(),
     onRemoveFile: (String) -> Unit,
     onClearAll: () -> Unit,
     onPickPhotos: () -> Unit,
@@ -168,6 +170,7 @@ fun StagedFilesList(
                 items(filteredFiles, key = { it.id }) { file ->
                     SharedFileItem(
                         file = file,
+                        activeTransfer = activeTransfer,
                         onRemove = { onRemoveFile(file.id) }
                     )
                 }
@@ -179,92 +182,140 @@ fun StagedFilesList(
 @Composable
 fun SharedFileItem(
     file: SharedFile,
+    activeTransfer: ActiveTransferProgress = ActiveTransferProgress(),
     onRemove: () -> Unit
 ) {
+    val isTransferring = activeTransfer.isActive && !activeTransfer.isReceiving &&
+            (activeTransfer.id == file.id || activeTransfer.fileName == file.name)
+
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = if (isTransferring) CardDefaults.outlinedCardBorder().copy(width = 1.5.dp, brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)) else null,
         modifier = Modifier
             .fillMaxWidth()
             .testTag("staged_file_${file.id}")
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // Thumbnail or category icon
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (file.category == FileCategory.PHOTO || file.category == FileCategory.VIDEO) {
-                    AsyncImage(
-                        model = file.uri,
-                        contentDescription = file.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = getCategoryIcon(file.category),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Thumbnail or category icon
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
                 ) {
+                    if (file.category == FileCategory.PHOTO || file.category == FileCategory.VIDEO) {
+                        AsyncImage(
+                            model = file.uri,
+                            contentDescription = file.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = getCategoryIcon(file.category),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = file.formattedSize,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = file.name,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = "•",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = file.category.labelArabic,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.primary
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = file.formattedSize,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "•",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = file.category.labelArabic,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onRemove,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("remove_file_${file.id}")
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "إزالة الملف",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
-            IconButton(
-                onClick = onRemove,
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("remove_file_${file.id}")
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "إزالة الملف",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
+            // In-card accurate Progress Bar when transferring
+            if (isTransferring) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "جاري الإرسال للحاسوب...",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "${activeTransfer.percentage}%",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { activeTransfer.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                }
             }
         }
     }
@@ -274,6 +325,7 @@ fun SharedFileItem(
 fun ReceivedFilesList(
     files: List<ReceivedFile>,
     selectedCategory: FileCategory,
+    activeTransfer: ActiveTransferProgress = ActiveTransferProgress(),
     onOpenFile: (ReceivedFile) -> Unit,
     onShareFile: (ReceivedFile) -> Unit,
     onDeleteFile: (ReceivedFile) -> Unit,
@@ -314,6 +366,7 @@ fun ReceivedFilesList(
                 items(filteredFiles, key = { it.id }) { file ->
                     ReceivedFileItem(
                         file = file,
+                        activeTransfer = activeTransfer,
                         onOpen = { onOpenFile(file) },
                         onShare = { onShareFile(file) },
                         onDelete = { onDeleteFile(file) }
@@ -327,11 +380,14 @@ fun ReceivedFilesList(
 @Composable
 fun ReceivedFileItem(
     file: ReceivedFile,
+    activeTransfer: ActiveTransferProgress = ActiveTransferProgress(),
     onOpen: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault()) }
+    val isTransferring = activeTransfer.isActive && activeTransfer.isReceiving &&
+            (activeTransfer.id == file.id || activeTransfer.fileName == file.name)
 
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -339,85 +395,127 @@ fun ReceivedFileItem(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = if (isTransferring) CardDefaults.outlinedCardBorder().copy(width = 1.5.dp, brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF10B981))) else null,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpen() }
             .testTag("received_file_${file.id}")
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF10B981).copy(alpha = 0.15f))
-                    .border(1.dp, Color(0xFF10B981).copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = getCategoryIcon(file.category),
-                    contentDescription = null,
-                    tint = Color(0xFF10B981),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = file.name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                        .border(1.dp, Color(0xFF10B981).copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = file.formattedSize,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Icon(
+                        imageVector = getCategoryIcon(file.category),
+                        contentDescription = null,
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(24.dp)
                     )
-                    Text("•", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = dateFormat.format(Date(file.timestamp)),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = file.name,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = file.formattedSize,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text("•", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = dateFormat.format(Date(file.timestamp)),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(
+                        onClick = onShare,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("share_file_${file.id}")
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = "مشاركة",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("delete_file_${file.id}")
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteOutline,
+                            contentDescription = "حذف",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(
-                    onClick = onShare,
+            // In-card accurate Progress Bar when receiving
+            if (isTransferring) {
+                Column(
                     modifier = Modifier
-                        .size(36.dp)
-                        .testTag("share_file_${file.id}")
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = "مشاركة",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("delete_file_${file.id}")
-                ) {
-                    Icon(
-                        Icons.Default.DeleteOutline,
-                        contentDescription = "حذف",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "جاري استلام الملف...",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981)
+                        )
+                        Text(
+                            text = "${activeTransfer.percentage}%",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { activeTransfer.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = Color(0xFF10B981),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 }
             }
